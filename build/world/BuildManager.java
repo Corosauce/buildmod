@@ -3,6 +3,8 @@ package build.world;
 import java.util.LinkedList;
 import java.util.List;
 
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockStairs;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityList;
 import net.minecraft.entity.item.EntityItem;
@@ -11,8 +13,11 @@ import net.minecraft.network.packet.Packet;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.ChunkCoordinates;
+import net.minecraft.util.MathHelper;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
+import net.minecraftforge.common.DimensionManager;
+import net.minecraftforge.common.ForgeDirection;
 import build.SchematicData;
 import cpw.mods.fml.common.FMLCommonHandler;
 
@@ -26,9 +31,10 @@ public class BuildManager {
 	//Building related below
 	
 	//global settings
-	public int offset = 0;
 	public int build_rate = 100000;
 	public int build_rand = 20;
+	
+	public int placeholderID = 1; //stone
 	
 	public BuildManager() {
 		activeBuilds = new LinkedList();
@@ -126,7 +132,7 @@ public class BuildManager {
     	
     	build_rate = 1000;
     	
-    	build_rate = 99999999;
+    	build_rate = buildJob.build_rate;
     	
     	
     	
@@ -146,6 +152,7 @@ public class BuildManager {
     	//build_rand = 20;
     	
     	try {
+    		//seriously outdated mode, needs to be brought up to spec with various fixes and format updates
 	    	if (buildJob.doRandomBuild) {
 	    		if (worldRef.rand.nextInt(build_rand) != 0) return;
 	    		boolean first = true;
@@ -172,7 +179,7 @@ public class BuildManager {
 				    		id = build.build_blockIDArr[buildJob.build_loopTickX][buildJob.build_loopTickY][buildJob.build_loopTickZ];
 			
 				    		//damn you mcedit
-				    		if (id < 0) id += 256;
+				    		if (id < 0) id += 4096;
 				    		
 				    		int xx = buildJob.build_startX+buildJob.build_loopTickX;
 				    		int yy = buildJob.build_startY+buildJob.build_loopTickY;
@@ -231,7 +238,9 @@ public class BuildManager {
 			    			buildJob.build_loopTickZ = 0;
 			    			buildJob.build_loopTickY = 0;
 			    			
-			    			buildJob.timeout = 20;
+			    			buildJob.timeout = 5;
+			    			
+			    			if (buildJob.customGenCallback != null) buildJob.customGenCallback.genPassPre(worldRef, buildJob, buildJob.pass);
 			    			
 			    			if (buildJob.pass == 1) {
 			    				//System.out.println("Map size: " + build.map_sizeX + " - " + build.map_sizeY + " - " + build.map_sizeZ);
@@ -262,7 +271,7 @@ public class BuildManager {
 			    		ChunkCoordinates coords = new ChunkCoordinates(xx, yy, zz);
 		    			
 		    			if (buildJob.useRotationBuild) {
-		    				coords = rotate(coords, buildJob.rotation, 
+		    				coords = rotate(coords, buildJob.direction, 
 		    						Vec3.createVectorHelper(buildJob.build_startX, buildJob.build_startY, buildJob.build_startZ), 
 		    						Vec3.createVectorHelper(build.map_sizeX, build.map_sizeY, build.map_sizeZ));
 		    			}
@@ -280,7 +289,12 @@ public class BuildManager {
 					    		id = build.build_blockIDArr[buildJob.build_loopTickX][buildJob.build_loopTickY][buildJob.build_loopTickZ];
 					    		int meta = build.build_blockMetaArr[buildJob.build_loopTickX][buildJob.build_loopTickY][buildJob.build_loopTickZ];
 					    		//damn you mcedit ... ?
-					    		if (id < 0) id += 256;
+					    		//if (id < 0) id += 4096;
+					    		if (!build.newFormat) {
+					    			if (id < 0) id += 256;
+					    		} else {
+					    			if (id < 0) id += 4096;
+					    		}
 					    		
 					    		int xx = buildJob.build_startX+buildJob.build_loopTickX;
 					    		int yy = buildJob.build_startY+buildJob.build_loopTickY;
@@ -301,16 +315,31 @@ public class BuildManager {
 					    			//}
 					    			//}
 					    			//worldRef.setBlockAndMetadata(build_startX+build_loopTickX, build_startY+build_loopTickY, build_startZ+build_loopTickZ, 0, 0);
-					    			
+					    			//System.out.println("newFormat: " + build.newFormat);
 					    			ChunkCoordinates coords = new ChunkCoordinates(xx, yy, zz);
-					    			
+					    			//System.out.println("printing: " + id + ", preMeta: " + meta);
 					    			if (buildJob.useRotationBuild) {
-					    				coords = rotate(coords, buildJob.rotation, 
+					    				coords = rotate(coords, buildJob.direction, 
 					    						Vec3.createVectorHelper(buildJob.build_startX, buildJob.build_startY, buildJob.build_startZ), 
 					    						Vec3.createVectorHelper(build.map_sizeX, build.map_sizeY, build.map_sizeZ));
+					    				
+					    				int tryMeta = rotateMeta(worldRef, coords, buildJob.rotation, id, meta);
+					    				if (tryMeta != -1) meta = tryMeta;
 					    			}
 					    			
-					    			worldRef.setBlock(coords.posX, coords.posY, coords.posZ, id, meta, 2);
+					    			//System.out.println("printing: " + id + ", postMeta: " + meta);
+					    			//new protection against schematics printing missing ids that will eventually crash the game
+					    			if (Block.blocksList[id] != null) {
+					    				worldRef.setBlock(coords.posX, coords.posY, coords.posZ, id, meta, 2);
+					    			} else {
+					    				System.out.println("BUILDMOD SEVERE: schematic contains non existant blockID: " + id + ", replacing with blockID: " + placeholderID);
+					    				worldRef.setBlock(coords.posX, coords.posY, coords.posZ, placeholderID, 0, 2);
+					    			}
+					    			/*if (id != 0) {
+					    				boolean returnVal = Block.blocksList[id].rotateBlock(worldRef, coords.posX, coords.posY, coords.posZ, ForgeDirection.EAST);
+					    				if (id == Block.torchWood.blockID) System.out.println("returnVal " + returnVal);
+					    			}*/
+					    			
 					    			//worldRef.setBlock(xx, yy, zz, id);
 					    			//worldRef.setBlockMetadata(xx, yy, zz, meta);
 					    			
@@ -342,8 +371,20 @@ public class BuildManager {
     	//worldRef.editingBlocks = false;
     }
 	
+	public static void rotateSet(BuildJob parBuildJob, ChunkCoordinates coords, int id, int meta) {
+		
+		coords = rotate(coords, parBuildJob.direction, 
+				Vec3.createVectorHelper(parBuildJob.build_startX, parBuildJob.build_startY, parBuildJob.build_startZ), 
+				Vec3.createVectorHelper(parBuildJob.build.map_sizeX, parBuildJob.build.map_sizeY, parBuildJob.build.map_sizeZ));
+		World world = DimensionManager.getWorld(parBuildJob.build.dim);
+		if (world != null) {
+			world.setBlock(coords.posX, coords.posY, coords.posZ, id, meta, 2);
+		}
+	}
+	
 	/* coords: unrotated world coord, rotation: quantify to 90, start: uncentered world coords for structure start point, size: structure size */
-	public ChunkCoordinates rotate(ChunkCoordinates coords, double rotation, Vec3 start, Vec3 size) {
+	public static ChunkCoordinates rotate(ChunkCoordinates coords, int direction, Vec3 start, Vec3 size) {
+		double rotation = (direction * 90) + 180;
 		double centerX = start.xCoord+(size.xCoord/2D);
 		double centerZ = start.zCoord+(size.zCoord/2D);
 		double vecX = coords.posX - centerX + 0.05; //+0.05 fixes the 0 angle distance calculation issue
@@ -352,7 +393,81 @@ public class BuildManager {
 		double rotYaw = (float)(Math.atan2(vecZ, vecX) * 180.0D / Math.PI) - rotation;
 		double newX = start.xCoord + Math.cos(rotYaw * 0.017453D) * distToCenter;
 		double newZ = start.zCoord + Math.sin(rotYaw * 0.017453D) * distToCenter;
+		
+		//fix some bad centering rotations
+		if (direction == 1) {
+			newZ++;
+		} else if (direction == 2) {
+			newX++;
+			newZ++;
+		} else if (direction == 3) {
+			newX++;
+		}
+		
 		return new ChunkCoordinates((int)Math.floor(newX), coords.posY, (int)Math.floor(newZ));
+	}
+	
+	public int rotateMeta(World par1World, ChunkCoordinates coords, double rotation, int id, int meta) {
+		int dir = MathHelper.floor_double((double)(rotation * 4.0F / 360.0F) + 0.5D) & 3;
+		
+		dir = (((int)rotation) / 90) & 3;
+		
+		Block block = Block.blocksList[id];
+		
+		if (block instanceof BlockStairs) {
+			
+			int rotateMeta = meta & 4;
+			
+			//System.out.println("dir: " + dir + ", meta: " + meta + ", rotateMeta: " + rotateMeta);
+			
+			int fMeta = -1;
+
+	        /*if (dir == 0) fMeta = 0;// | i1;
+	        if (dir == 1) fMeta = 3;// | i1;
+	        if (dir == 2) fMeta = 1;// | i1;
+	        if (dir == 3) fMeta = 2;// | i1;
+*/	        
+			if (dir == 0) {
+				//do nothing, assumed proper
+			} else if (dir == 1) {
+				if (meta == 0) {
+					fMeta = 3;
+				} else if (meta == 1) {
+					fMeta = 2;
+				} else if (meta == 2) {
+					fMeta = 0;
+				} else if (meta == 3) {
+					fMeta = 1;
+				}
+			} else if (dir == 2) {
+				if (meta == 0) {
+					fMeta = 1;
+				} else if (meta == 1) {
+					fMeta = 0;
+				} else if (meta == 2) {
+					fMeta = 3;
+				} else if (meta == 3) {
+					fMeta = 2;
+				}
+			} else if (dir == 3) {
+				if (meta == 0) {
+					fMeta = 2;
+				} else if (meta == 1) {
+					fMeta = 3;
+				} else if (meta == 2) {
+					fMeta = 1;
+				} else if (meta == 3) {
+					fMeta = 0;
+				}
+			}
+			
+	        //System.out.println("fMeta: " + fMeta);
+	        
+	        return fMeta | rotateMeta;
+		}
+		
+		//failed
+        return -1;
 	}
 	
 	public void buildComplete(BuildJob buildJob) {
@@ -404,17 +519,27 @@ public class BuildManager {
         {
             for (int var21 = 0; var21 < build.tileEntities.tagCount(); ++var21)
             {
+            	//this has been recently changed, make sure it still works with new "get existing tile entity, give it the nbt and fix coords"
+            	//it fixed (still does) the loaded tile entities coords that went from abs -> rel on writeout and reversed on read
+            	//verified that this loads ZC tile nbt ok
                 NBTTagCompound var20 = (NBTTagCompound)build.tileEntities.tagAt(var21);
-                TileEntity var13 = TileEntity.createAndLoadEntity(var20);
+                //TileEntity var13 = TileEntity.createAndLoadEntity(var20);
+                TileEntity var13 = worldRef.getBlockTileEntity(build.map_coord_minX+var20.getInteger("x"), buildJob.build_startY+var20.getInteger("y"), build.map_coord_minZ+var20.getInteger("z"));
                 
                 if (var13 instanceof SchematicData) {
                 	((SchematicData)var13).readFromNBT(var20, build);
                 }
                 
                 if (var13 != null) {
-	                var13.xCoord = build.map_coord_minX+var13.xCoord;
-	                var13.yCoord = buildJob.build_startY+var13.yCoord;
-	                var13.zCoord = build.map_coord_minZ+var13.zCoord;
+                	
+                	//warning, some tile entities might not have written out with relative coords properly, implement something to tell what tile entities have had relative coords set on them
+                	//once stuff using new marking is rescanned/saved, uncomment this if statement
+                	//is there actually any harm in always setting this though?
+                	//if (!build.newFormat || (var20.hasKey("coordsSetRelative"))) {
+		                var13.xCoord = build.map_coord_minX+var13.xCoord;
+		                var13.yCoord = buildJob.build_startY+var13.yCoord;
+		                var13.zCoord = build.map_coord_minZ+var13.zCoord;
+                	//}
 	
 	                try {
 	                	Packet packet = var13.getDescriptionPacket();
@@ -425,10 +550,11 @@ public class BuildManager {
 	                	ex.printStackTrace();
 	                }
 	                
-	                worldRef.removeBlockTileEntity(var13.xCoord, var13.yCoord, var13.zCoord);
-	                worldRef.setBlockTileEntity(var13.xCoord, var13.yCoord, var13.zCoord, var13);
+	                //what is this crap!, GET the tile entity and 
+	                //worldRef.removeBlockTileEntity(var13.xCoord, var13.yCoord, var13.zCoord);
+	                //worldRef.setBlockTileEntity(var13.xCoord, var13.yCoord, var13.zCoord, var13);
 	                
-	                worldRef.loadedTileEntityList.add(var13);
+	                //worldRef.loadedTileEntityList.add(var13);
                 }
                 
                 /*if (var13 != null)

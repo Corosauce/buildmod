@@ -1,13 +1,17 @@
 package build;
 
+import java.util.EnumSet;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.util.MathHelper;
 import net.minecraft.util.MovingObjectPosition;
-
-import java.util.EnumSet;
+import net.minecraft.util.Vec3;
 
 import org.lwjgl.input.Keyboard;
 
+import build.config.BuildConfig;
 import build.enums.EnumBuildState;
 import build.enums.EnumCopyState;
 import build.render.Overlays;
@@ -19,16 +23,26 @@ import cpw.mods.fml.common.TickType;
 
 public class BuildClientTicks implements ITickHandler
 {
+	//plan to make dedi server compatible
+	//client still controls the states
+	//client still makes its own clip data, BUT also sends coords etc to server so it can do the same
+	//server needs:
+	/// handle clipboard for each player, support for array of things per player
+	/// handles commands:
+	//// copy command, sends all needed data, writes to players server clipboard, clients already ready
+	//// build command, sends build coords and rotation
+	
 	//Player based fields
-	public EnumBuildState buildState = EnumBuildState.NORMAL;
-	public EnumCopyState copyState = EnumCopyState.NORMAL;
-	public int key_Build = Keyboard.KEY_B;
-	public int key_Copy = Keyboard.KEY_C;
-	public Build clipboardData;
+	public EnumBuildState buildState = EnumBuildState.NORMAL; //client
+	public EnumCopyState copyState = EnumCopyState.NORMAL; //client
+	
+	public Build clipboardData; //client & server
 	
     public MovingObjectPosition extendedMouseOver = null;
     
     public static BuildClientTicks i = null;
+    
+    public int direction = 0;
     
     public BuildClientTicks() {
     	clipboardData = new Build(0, 0, 0, "build");
@@ -79,15 +93,17 @@ public class BuildClientTicks implements ITickHandler
     {
     	Minecraft mc = FMLClientHandler.instance().getClient();
     	
-    	if (mc.renderViewEntity != null) extendedMouseOver = mc.renderViewEntity.rayTrace(10, partialTicks);
+    	if (mc.renderViewEntity != null) extendedMouseOver = mc.renderViewEntity.rayTrace(20, partialTicks);
     	
-        //TODO: Your Code Here
     	if (buildState == EnumBuildState.PLACE) {
-    		Overlays.renderBuildOutline(clipboardData);
+    		//EntityPlayer player = FMLClientHandler.instance().getClient().thePlayer;
+    		//int l = MathHelper.floor_double((double)((-player.rotationYaw-45) * 4.0F / 360.0F)/* + 0.5D*/) & 3;
+    		Overlays.renderBuildOutline(clipboardData, direction);
+    		Overlays.renderDirectionArrow(clipboardData, direction);
     	} else if (copyState == EnumCopyState.SETMAX) {
-    		float x = (float)mc.thePlayer.posX;
-    		float y = (float)mc.thePlayer.posY;
-    		float z = (float)mc.thePlayer.posZ;
+    		int x = (int)MathHelper.floor_double(mc.thePlayer.posX);
+    		int y = (int)MathHelper.floor_double(mc.thePlayer.posY - mc.thePlayer.yOffset);
+    		int z = (int)MathHelper.floor_double(mc.thePlayer.posZ);
     		if (extendedMouseOver != null) {
     			x = extendedMouseOver.blockX;
     			y = extendedMouseOver.blockY;
@@ -121,26 +137,41 @@ public class BuildClientTicks implements ITickHandler
     	
     	if (buildState == EnumBuildState.PLACE) {
     		if (extendedMouseOver != null) {
-    			clipboardData.setCornerPosition(extendedMouseOver.blockX - (clipboardData.map_sizeX / 2), extendedMouseOver.blockY+1, extendedMouseOver.blockZ - (clipboardData.map_sizeX / 2));
+    			//clipboardData.setCornerPosition(extendedMouseOver.blockX - (clipboardData.map_sizeX / 2), extendedMouseOver.blockY+1, extendedMouseOver.blockZ - (clipboardData.map_sizeZ / 2));
+    			clipboardData.setCornerPosition(extendedMouseOver.blockX, extendedMouseOver.blockY+1, extendedMouseOver.blockZ);
     		} else {
-    			clipboardData.setCornerPosition((int)mc.thePlayer.posX - (clipboardData.map_sizeX / 2), (int)mc.thePlayer.posY, (int)mc.thePlayer.posZ - (clipboardData.map_sizeX / 2));
+    			clipboardData.setCornerPosition((int)MathHelper.floor_double(mc.thePlayer.posX), (int)MathHelper.floor_double(mc.thePlayer.posY - mc.thePlayer.yOffset), (int)MathHelper.floor_double(mc.thePlayer.posZ));
     		}
     	}
     	
-    	//updateInput();
+    	if (BuildConfig.enableEditMode) {
+    		updateInput();
+    	} else {
+    		copyState = EnumCopyState.NORMAL;
+    		buildState = EnumBuildState.NORMAL;
+    	}
     	
 	}
     
     public void updateInput() {
-    	if (Keyboard.isKeyDown(key_Build)) {
+    	
+    	if (Keyboard.isKeyDown(Keyboard.getKeyIndex(BuildConfig.key_Copy))) {
+    		buildState = EnumBuildState.NORMAL; //reset
+			if (!wasKeyDown) {
+				eventCopy();
+			}
+			wasKeyDown = true;
+    	} else if (Keyboard.isKeyDown(Keyboard.getKeyIndex(BuildConfig.key_Build))) {
+    		copyState = EnumCopyState.NORMAL; //reset
 			if (!wasKeyDown) {
 				eventBuild();
 			}
 			wasKeyDown = true;
-    	} else if (Keyboard.isKeyDown(key_Copy)) {
-			if (!wasKeyDown) {
-				eventCopy();
-			}
+    	} else if (Keyboard.isKeyDown(Keyboard.getKeyIndex(BuildConfig.key_Rotate))) {
+    		if (!wasKeyDown && buildState == EnumBuildState.PLACE) {
+    			direction++;
+    			if (direction > 3) direction = 0;
+    		}
 			wasKeyDown = true;
 		} else {
 			wasKeyDown = false;
@@ -155,26 +186,28 @@ public class BuildClientTicks implements ITickHandler
     		copyState = EnumCopyState.SETMIN;
     	} else if (copyState == EnumCopyState.SETMIN) {
     		copyState = EnumCopyState.SETMAX;
-    		sx = (int)mc.thePlayer.posX;
+    		sx = (int)MathHelper.floor_double(mc.thePlayer.posX);
     		sy = (int)(mc.thePlayer.posY - mc.thePlayer.yOffset);
-    		sz = (int)mc.thePlayer.posZ;
+    		sz = (int)MathHelper.floor_double(mc.thePlayer.posZ);
     		if (extendedMouseOver != null) {
     			sx = extendedMouseOver.blockX;
     			sy = extendedMouseOver.blockY;
     			sz = extendedMouseOver.blockZ;
     		}
     	} else {
-    		ex = (int)mc.thePlayer.posX;
+    		ex = (int)MathHelper.floor_double(mc.thePlayer.posX);
     		ey = (int)(mc.thePlayer.posY - mc.thePlayer.yOffset);
-    		ez = (int)mc.thePlayer.posZ;
+    		ez = (int)MathHelper.floor_double(mc.thePlayer.posZ);
     		if (extendedMouseOver != null) {
 	    		ex = extendedMouseOver.blockX;
 				ey = extendedMouseOver.blockY;
 				ez = extendedMouseOver.blockZ;
     		}
 			
-			clipboardData.recalculateLevelSize(sx, sy, sz, ex, ey, ez);
-			clipboardData.scanLevelToData();
+    		//REWIRED TO SEND ACTION TO SERVER AS WELL
+			clipboardData.recalculateLevelSize(sx, sy, sz, ex, ey, ez, true);
+			clipboardData.scanLevelToData(FMLClientHandler.instance().getClient().theWorld);
+			FMLClientHandler.instance().getClient().thePlayer.sendQueue.addToSendQueue(BuildPacketHandler.getBuildCommandPacket(clipboardData, 0, -1));
 			
     		copyState = EnumCopyState.NORMAL;
     	}
@@ -188,7 +221,12 @@ public class BuildClientTicks implements ITickHandler
     		buildState = EnumBuildState.PLACE;
     	} else if (buildState == EnumBuildState.PLACE) {
     		buildState = EnumBuildState.NORMAL;
-    		BuildServerTicks.buildMan.addBuild(new BuildJob(0, clipboardData));
+    		
+    		//REWIRE TO SEND ACTION TO SERVER INSTEAD
+    		
+    		FMLClientHandler.instance().getClient().thePlayer.sendQueue.addToSendQueue(BuildPacketHandler.getBuildCommandPacket(clipboardData, 1, direction));
+    		
+    		
     	}
     }
 }

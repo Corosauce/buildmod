@@ -1,20 +1,27 @@
 package build.world;
 
-import net.minecraft.nbt.CompressedStreamTools;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.world.World;
-
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
+import net.minecraft.block.Block;
+import net.minecraft.nbt.CompressedStreamTools;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagInt;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.world.World;
 import build.SchematicData;
 import cpw.mods.fml.common.FMLCommonHandler;
 
 public class Build {
 
+	public static int blockIDHighestVanilla = 158; //figure out an elegant non loop crazy way to determine this automatically
+	
 	//public int id = 0;
 	public String file = "";
 
@@ -39,6 +46,8 @@ public class Build {
 	public int build_blockMetaArr[][][];
 	public boolean build_blockPlaced[][][];
 	
+	public HashMap<Integer, Integer> blockMappingNameToID = new HashMap<Integer, Integer>();
+	
 	//REFACTOR THESE NAMES TO THE ABOVE COMMENTED OUT ONES ONCE COMPILING
 	public int map_sizeX = 0;
 	public int map_sizeY = 0;
@@ -49,6 +58,10 @@ public class Build {
 	public int map_surfaceOffset = 0;
 	
 	public int dim = 0;
+	
+	//the new format
+	//- was to use integers instead of bytes, but that even wont be needed if unlocalized names are used (though use integer for saving out 
+	public boolean newFormat = false;
 	
 	public Build(int x, int y, int z, String parFile) {
 		//id = parID;
@@ -139,8 +152,16 @@ public class Build {
 	    	
 	    	levelData = nbttagcompound;
 	    	
-			byte metadata[] = nbttagcompound.getByteArray("Data");
-			byte blockids[] = nbttagcompound.getByteArray("Blocks");
+	    	//only override newFormat if schematic actually tells it to, this also assumes the outside setting is right context...
+	    	if (nbttagcompound.hasKey("newFormat")) {
+	    		newFormat = nbttagcompound.getBoolean("newFormat");
+	    	}
+	    	
+	    	if (newFormat) {
+		    	NBTTagCompound nbtMapping = nbttagcompound.getCompoundTag("blockTranslationMap");
+		    	this.blockMappingNameToID = genBlockIDSchemToNewIDMap(nbtMapping);
+	    	}
+	    	
 			tileEntities = nbttagcompound.getTagList("TileEntities");
 			entities = nbttagcompound.getTagList("Entities");
 			
@@ -171,24 +192,54 @@ public class Build {
             [sizeY]
             [sizeZ];
 			
-			for (int xx = 0; xx < sizeX; xx++) {
-				for (int yy = 0; yy < sizeY; yy++) {
-					for (int zz = 0; zz < sizeZ; zz++) {
-						int index = yy * sizeX * sizeZ + zz * sizeX + xx;
-						build_blockIDArr[xx][yy][zz] = blockids[index];
-						build_blockMetaArr[xx][yy][zz] = metadata[index];
-						build_blockPlaced[xx][yy][zz] = false;
-						
+			if (newFormat) {
+				int metadata[] = nbttagcompound.getIntArray("Data");
+				int blockids[] = nbttagcompound.getIntArray("Blocks");
+				
+				for (int xx = 0; xx < sizeX; xx++) {
+					for (int yy = 0; yy < sizeY; yy++) {
+						for (int zz = 0; zz < sizeZ; zz++) {
+							int index = yy * sizeX * sizeZ + zz * sizeX + xx;
+							build_blockIDArr[xx][yy][zz] = blockids[index];
+							build_blockMetaArr[xx][yy][zz] = metadata[index];
+							
+							//time to translate using mapping!
+							int a = build_blockIDArr[xx][yy][zz];
+							if (a > blockIDHighestVanilla) {
+								int b = this.blockMappingNameToID.get(a);
+								//System.out.println("tra: " + a + " -> " + b);
+								build_blockIDArr[xx][yy][zz] = b;
+							}
+							
+							build_blockPlaced[xx][yy][zz] = false;
+						}
+					}
+				}
+			} else {
+				byte metadata[] = nbttagcompound.getByteArray("Data");
+				byte blockids[] = nbttagcompound.getByteArray("Blocks");
+				
+				for (int xx = 0; xx < sizeX; xx++) {
+					for (int yy = 0; yy < sizeY; yy++) {
+						for (int zz = 0; zz < sizeZ; zz++) {
+							int index = yy * sizeX * sizeZ + zz * sizeX + xx;
+							build_blockIDArr[xx][yy][zz] = blockids[index];
+							build_blockMetaArr[xx][yy][zz] = metadata[index];
+							build_blockPlaced[xx][yy][zz] = false;
+							
+						}
 					}
 				}
 			}
+			
+			
 			
 			file = level;
 			//ZCGame.instance.mapMan.curLevel = level;
 			
 		} catch (Exception ex) {
 			//notification off until generic build copy paste interface is supported for server
-			//ex.printStackTrace();
+			ex.printStackTrace();
 		}
 		
 	}
@@ -211,6 +262,10 @@ public class Build {
 	}
 	
 	public void scanLevelToData() {
+		scanLevelToData(FMLCommonHandler.instance().getMinecraftServerInstance().worldServerForDimension(dim));
+	}
+	
+	public void scanLevelToData(World worldObj) {
 		
 		resetData();
 		
@@ -221,11 +276,14 @@ public class Build {
 				for (int zz = 0; zz < map_sizeZ; zz++) {
 					int index = yy * map_sizeX * map_sizeZ + zz * map_sizeX + xx;
 					
-					World worldRef = FMLCommonHandler.instance().getMinecraftServerInstance().worldServerForDimension(dim);
+					//this line is not client side friendly
+					World worldRef = worldObj;
 					
 					build_blockIDArr[xx][yy][zz] = worldRef.getBlockId(map_coord_minX+xx, map_coord_minY+yy, map_coord_minZ+zz);
 					build_blockMetaArr[xx][yy][zz] = worldRef.getBlockMetadata(map_coord_minX+xx, map_coord_minY+yy, map_coord_minZ+zz);
 					build_blockPlaced[xx][yy][zz] = false;
+					
+					//System.out.println("build_blockIDArr[xx][yy][zz]: " + build_blockIDArr[xx][yy][zz]);
 					
 					//check for tile entity to write out!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 					
@@ -247,11 +305,12 @@ public class Build {
 				System.out.println("New NBT Data Object");
 				levelData = new NBTTagCompound();
 			}
-				
-			byte metadata[] = new byte[map_sizeX * map_sizeY * map_sizeZ];// = levelData.getByteArray("Data");
-			byte blockids[] = new byte[map_sizeX * map_sizeY * map_sizeZ];// = levelData.getByteArray("Blocks");
-			//tileEntities = nbttagcompound.getTagList("TileEntities");
-			//entities = nbttagcompound.getTagList("Entities");
+			
+			//Init both formats cause java is bitchy
+			int metadataInt[] = new int[map_sizeX * map_sizeY * map_sizeZ];
+			int blockidsInt[] = new int[map_sizeX * map_sizeY * map_sizeZ];
+			byte metadataByte[] = new byte[map_sizeX * map_sizeY * map_sizeZ];
+			byte blockidsByte[] = new byte[map_sizeX * map_sizeY * map_sizeZ];
 			
 			NBTTagList var16 = new NBTTagList();
 			
@@ -260,8 +319,13 @@ public class Build {
 					for (int zz = 0; zz < map_sizeZ; zz++) {
 						int index = yy * map_sizeX * map_sizeZ + zz * map_sizeX + xx;
 						
-						blockids[index] = (byte)build_blockIDArr[xx][yy][zz];
-						metadata[index] = (byte)build_blockMetaArr[xx][yy][zz];
+						if (newFormat) {
+							blockidsInt[index] = build_blockIDArr[xx][yy][zz];
+							metadataInt[index] = build_blockMetaArr[xx][yy][zz];
+						} else {
+							blockidsByte[index] = (byte)build_blockIDArr[xx][yy][zz];
+							metadataByte[index] = (byte)build_blockMetaArr[xx][yy][zz];
+						}
 						
 						World worldRef = FMLCommonHandler.instance().getMinecraftServerInstance().worldServerForDimension(dim);
 						
@@ -276,6 +340,7 @@ public class Build {
 							}
 							
 							//adjust coords to be relative to the schematic file
+							var10.setBoolean("coordsSetRelative", true);
 							var10.setInteger("x", xx);
 							var10.setInteger("y", yy);
 							var10.setInteger("z", zz);
@@ -293,8 +358,15 @@ public class Build {
 			//somehow get all entities within bounds
 			//loadedentity list bounds check
 			
-			levelData.setByteArray("Blocks", blockids);
-			levelData.setByteArray("Data", metadata);
+	        if (newFormat) {
+	        	levelData.setIntArray("Blocks", blockidsInt);
+				levelData.setIntArray("Data", metadataInt);
+	        } else {
+				levelData.setByteArray("Blocks", blockidsByte);
+				levelData.setByteArray("Data", metadataByte);
+	        }
+	        levelData.setBoolean("newFormat", newFormat);
+	        levelData.setCompoundTag("blockTranslationMap", genBlockIDToNameMap());
 			
 			levelData.setShort("Width", (short)map_sizeX);
 			levelData.setShort("Height", (short)map_sizeY);
@@ -306,6 +378,56 @@ public class Build {
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
+	}
+	
+	//lets try: still write out using existing block ids, but this map does those ids -> unlocalizedname
+	//then on printing, do schematic id -> unlocalizedname -> lookup the new id
+	//for write out
+	public NBTTagCompound genBlockIDToNameMap() {
+		NBTTagCompound nbt = new NBTTagCompound();
+		
+		for (int i = 0; i < Block.blocksList.length; i++) {
+        	Block block = Block.blocksList[i];
+        	if (block != null) {
+        		if (i > blockIDHighestVanilla && !block.getUnlocalizedName().equals("tile.ForgeFiller")) {
+        			//set both lookup methods, or not, since you have to iterate it, make it easier
+        			//nbt.setString("" + i, block.getUnlocalizedName());
+        			nbt.setInteger(block.getUnlocalizedName(), i);
+        		}
+        	}
+        }
+
+		return nbt;
+	}
+	
+	//for read in, more complicated
+	public HashMap<Integer, Integer> genBlockIDSchemToNewIDMap(NBTTagCompound parMappingNBT) {
+		HashMap<String, Integer> swapMap = new HashMap<String, Integer>();
+		HashMap<Integer, Integer> finalMap = new HashMap<Integer, Integer>();
+		try {
+			
+			//first, generate the swapMap for the running mc block name -> id
+			for (int i = 0; i < Block.blocksList.length; i++) {
+	        	Block block = Block.blocksList[i];
+	        	if (block != null) {
+	        		if (i > blockIDHighestVanilla && !block.getUnlocalizedName().equals("tile.ForgeFiller")) {
+	        			swapMap.put(block.getUnlocalizedName(), i);
+	        		}
+	        	}
+			}
+			
+			Collection playerDataCl = parMappingNBT.getTags();
+			Iterator it = playerDataCl.iterator();
+			
+			while (it.hasNext()) {
+				NBTTagInt tag = (NBTTagInt)it.next();
+				finalMap.put(tag.data, swapMap.get(tag.getName()));
+			}
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+		
+		return finalMap;
 	}
 	
 	public void saveLevelData(String level) {

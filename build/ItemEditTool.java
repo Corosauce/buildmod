@@ -4,6 +4,7 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.Icon;
 import net.minecraft.world.World;
 
 import org.lwjgl.input.Keyboard;
@@ -45,6 +46,10 @@ public class ItemEditTool extends Item {
 		buildData = new Build(0, 0, 0, "build");
     }
     
+    public Icon getIconFromDamage(int par1) {
+    	return Item.fishingRod.getIconFromDamage(0);
+    }
+    
     public ItemStack onItemRightClick(ItemStack par1ItemStack, World par2World, EntityPlayer par3EntityPlayer)
     {
     	
@@ -66,6 +71,7 @@ public class ItemEditTool extends Item {
     			x2 = i; y2 = j; z2 = k;
     			System.out.println("maxCoords Set -> X: "+String.valueOf(i)+" Y: "+String.valueOf(j)+" Z: "+String.valueOf(k));
     			//ZCGame.instance.setModeMessage("maxCoords Set -> X: "+String.valueOf(i)+" Y: "+String.valueOf(j)+" Z: "+String.valueOf(k));
+    			buildData.resetData();
     			buildData.recalculateLevelSize(x1, y1, z1, x2, y2, z2);
     			buildData.writeNBT();
     			subMode = 0;
@@ -83,6 +89,8 @@ public class ItemEditTool extends Item {
     @Override
     public boolean onItemUse(ItemStack par1ItemStack, EntityPlayer par2EntityPlayer, World par3World, int i, int j, int k, int par7, float f1, float f2, float f3)
     {
+    	
+    	if (true) return false;
     	
     	if (par3World.isRemote) return false;
     	

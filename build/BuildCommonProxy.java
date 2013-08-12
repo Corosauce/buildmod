@@ -1,9 +1,12 @@
 package build;
 
+import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.world.World;
 
 import cpw.mods.fml.common.network.IGuiHandler;
+import cpw.mods.fml.common.registry.GameRegistry;
+import cpw.mods.fml.common.registry.LanguageRegistry;
 import cpw.mods.fml.common.registry.TickRegistry;
 import cpw.mods.fml.relauncher.Side;
 
@@ -20,8 +23,9 @@ public class BuildCommonProxy implements IGuiHandler
         mod = pMod;
         TickRegistry.registerTickHandler(new BuildServerTicks(), Side.SERVER);
         
-        //pMod.itemEditTool = (ItemEditTool) (new ItemEditTool(5467, 1)).setIconIndex(8).setItemName("build tool").setCreativeTab(CreativeTabs.tabMisc);
-        //ModLoader.addName(pMod.itemEditTool, "Build Tool");
+        //pMod.itemEditTool = (ItemEditTool) (new ItemEditTool(5467, 1)).setUnlocalizedName("buildTool").setCreativeTab(CreativeTabs.tabMisc);
+        //GameRegistry.registerItem(pMod.itemEditTool, "Build Tool");
+        //LanguageRegistry.addName(pMod.itemEditTool, "Build Tool");
     }
 
     public void registerRenderInformation()

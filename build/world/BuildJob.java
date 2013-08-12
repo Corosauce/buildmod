@@ -1,9 +1,11 @@
 package build.world;
 
-import net.minecraft.block.Block;
-
 import java.util.LinkedList;
 import java.util.List;
+
+import net.minecraft.block.Block;
+import net.minecraftforge.common.DimensionManager;
+import build.ICustomGen;
 
 public class BuildJob {
 
@@ -35,7 +37,15 @@ public class BuildJob {
     public boolean doRandomBuild = false;
     
     public boolean useRotationBuild = false;
+    public int direction = 0;
     public float rotation = 0;
+    
+    public boolean useFirstPass = true;
+    
+    public ICustomGen customGenCallback = null;
+    public int customGenOffset = 0;
+    
+    public int buildRate = 99999999;
 	
 	//REFACTOR THESE NAMES TO THE ABOVE COMMENTED OUT ONES ONCE COMPILING
 	/*public int map_sizeX = 0;
@@ -44,8 +54,6 @@ public class BuildJob {
 	public int map_coord_minX = 0;
 	public int map_coord_minY = 0;
 	public int map_coord_minZ = 0;*/
-	
-	
 	
 	public BuildJob(int parID, int x, int y, int z, String parFile) {
 		id = parID;
@@ -81,6 +89,11 @@ public class BuildJob {
 		}*/
 		
 		build = parBuild;
+	}
+	
+	public void setDirection(int dir) {
+		direction = dir;
+		rotation = (dir * 90) + 180;
 	}
 	
 	public void load() {
@@ -135,12 +148,14 @@ public class BuildJob {
 	public void buildStart() {
     	resetBuildState();
     	newBuild(build_startX, build_startY, build_startZ);
+    	pass = useFirstPass ? 0 : 1;
+    	if (customGenCallback != null) customGenCallback.genPassPre(DimensionManager.getWorld(build.dim), this, pass);
     	//build_startX = this.build.map_coord_minX;
     	//build_startY = this.build.map_coord_minY;
     	//build_startZ = this.build.map_coord_minZ;
     	
     	//shouldEntitiesReset = true;
-    	System.out.println("Level build starting");
+    	//System.out.println("Level build starting");
     }
     
     public void buildComplete() {
@@ -150,7 +165,7 @@ public class BuildJob {
 		//mod_ZombieCraft.worldRef.editingBlocks = false;
 		//spawnLevelEntities();
 		
-		System.out.println("Level build complete");
+		//System.out.println("Level build complete");
     }
     
     

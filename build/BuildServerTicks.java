@@ -40,6 +40,5 @@ public class BuildServerTicks implements ITickHandler
     public void onTickInGame()
     {
     	buildMan.updateTick();
-        //TODO: Your Code Here
     }
 }
