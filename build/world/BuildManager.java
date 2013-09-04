@@ -17,7 +17,6 @@ import net.minecraft.util.MathHelper;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
 import net.minecraftforge.common.DimensionManager;
-import net.minecraftforge.common.ForgeDirection;
 import build.SchematicData;
 import cpw.mods.fml.common.FMLCommonHandler;
 
@@ -138,8 +137,8 @@ public class BuildManager {
     	
     	//World worldRef = mod_ZombieCraft.worldRef;
     	
-    	
-    	boolean replaceAir = false;
+    	//if first pass mass AIR set is skipped, make sure the air from the schematics are printed, makes all mods happy
+    	boolean replaceAir = !buildJob.useFirstPass;
     	
     	int loopCount;
     	int id = 0;
@@ -329,7 +328,7 @@ public class BuildManager {
 					    			
 					    			//System.out.println("printing: " + id + ", postMeta: " + meta);
 					    			//new protection against schematics printing missing ids that will eventually crash the game
-					    			if (Block.blocksList[id] != null) {
+					    			if (Block.blocksList[id] != null || id == 0) {
 					    				worldRef.setBlock(coords.posX, coords.posY, coords.posZ, id, meta, 2);
 					    			} else {
 					    				System.out.println("BUILDMOD SEVERE: schematic contains non existant blockID: " + id + ", replacing with blockID: " + placeholderID);
@@ -528,6 +527,8 @@ public class BuildManager {
                 
                 if (var13 instanceof SchematicData) {
                 	((SchematicData)var13).readFromNBT(var20, build);
+                } else if (var13 != null) {
+                	var13.readFromNBT(var20);
                 }
                 
                 if (var13 != null) {

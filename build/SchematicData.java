@@ -1,7 +1,6 @@
 package build;
 
 import net.minecraft.nbt.NBTTagCompound;
-
 import build.world.Build;
 
 public interface SchematicData {

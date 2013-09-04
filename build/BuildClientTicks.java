@@ -4,10 +4,9 @@ import java.util.EnumSet;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.MovingObjectPosition;
-import net.minecraft.util.Vec3;
 
 import org.lwjgl.input.Keyboard;
 
@@ -16,7 +15,6 @@ import build.enums.EnumBuildState;
 import build.enums.EnumCopyState;
 import build.render.Overlays;
 import build.world.Build;
-import build.world.BuildJob;
 import cpw.mods.fml.client.FMLClientHandler;
 import cpw.mods.fml.common.ITickHandler;
 import cpw.mods.fml.common.TickType;
@@ -115,7 +113,24 @@ public class BuildClientTicks implements ITickHandler
 
     public void onRenderTick()
     {
-    	
+    	String mainStr = "";
+    	if (buildState == EnumBuildState.PLACE) {
+    		mainStr = "Paste Mode: (" + BuildConfig.key_Build + ") to paste, (" + BuildConfig.key_Rotate + ") to rotate, (" + BuildConfig.key_Copy + ") to cancel";
+    	} else if (copyState == EnumCopyState.SETMIN) {
+    		mainStr = "Copy Mode: Mark start coord with (" + BuildConfig.key_Copy + "), (" + BuildConfig.key_Build + ") to cancel";
+    	} else if (copyState == EnumCopyState.SETMAX) {
+    		mainStr = "Copy Mode: Mark end coord with (" + BuildConfig.key_Copy + "), (" + BuildConfig.key_Build + ") to cancel";
+    	}
+    	Minecraft mc = FMLClientHandler.instance().getClient();
+    	ScaledResolution var8 = new ScaledResolution(mc.gameSettings, mc.displayWidth, mc.displayHeight);
+        int width = var8.getScaledWidth();
+        int height = var8.getScaledHeight();
+        
+        int xOffset = width/2/* - 95 + 3*/;
+        int yOffset = height - 50;
+        
+    	int strWidth = mc.fontRenderer.getStringWidth(mainStr);
+    	mc.fontRenderer.drawStringWithShadow(mainStr, xOffset - strWidth/2, yOffset, 16777215);
     	
     }
 
@@ -156,16 +171,22 @@ public class BuildClientTicks implements ITickHandler
     public void updateInput() {
     	
     	if (Keyboard.isKeyDown(Keyboard.getKeyIndex(BuildConfig.key_Copy))) {
-    		buildState = EnumBuildState.NORMAL; //reset
-			if (!wasKeyDown) {
-				eventCopy();
-			}
+    		if (buildState != EnumBuildState.NORMAL) {
+        		buildState = EnumBuildState.NORMAL; //reset
+    		} else {
+    			if (!wasKeyDown) {
+    				eventCopy();
+    			}	
+    		}
 			wasKeyDown = true;
     	} else if (Keyboard.isKeyDown(Keyboard.getKeyIndex(BuildConfig.key_Build))) {
-    		copyState = EnumCopyState.NORMAL; //reset
-			if (!wasKeyDown) {
-				eventBuild();
-			}
+    		if (copyState != EnumCopyState.NORMAL) {
+        		copyState = EnumCopyState.NORMAL; //reset
+    		} else {
+    			if (!wasKeyDown) {
+    				eventBuild();
+    			}
+    		}
 			wasKeyDown = true;
     	} else if (Keyboard.isKeyDown(Keyboard.getKeyIndex(BuildConfig.key_Rotate))) {
     		if (!wasKeyDown && buildState == EnumBuildState.PLACE) {

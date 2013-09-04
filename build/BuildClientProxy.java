@@ -2,7 +2,6 @@ package build;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.src.ModLoader;
-
 import cpw.mods.fml.client.registry.RenderingRegistry;
 import cpw.mods.fml.common.registry.TickRegistry;
 import cpw.mods.fml.relauncher.Side;

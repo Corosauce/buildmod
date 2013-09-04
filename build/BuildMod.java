@@ -124,7 +124,7 @@ public class BuildMod
     
     @SideOnly(Side.CLIENT)
 	public static String getClientSidePath() {
-		return FMLClientHandler.instance().getClient().getMinecraftDir().getPath();
+		return FMLClientHandler.instance().getClient().mcDataDir.getPath();
 	}
 
 	public static void dbg(String string) {

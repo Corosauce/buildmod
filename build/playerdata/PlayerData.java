@@ -4,11 +4,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.util.HashMap;
 
-import build.BuildMod;
-import build.playerdata.objects.Clipboard;
-
 import net.minecraft.nbt.CompressedStreamTools;
 import net.minecraft.nbt.NBTTagCompound;
+import build.BuildMod;
+import build.playerdata.objects.Clipboard;
 
 public class PlayerData {
 

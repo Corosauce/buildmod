@@ -1,10 +1,6 @@
 package build.config;
 
-import org.lwjgl.input.Keyboard;
-
 import modconfig.IConfigCategory;
-import net.minecraft.block.Block;
-import net.minecraftforge.common.Configuration;
 
 public class BuildConfig implements IConfigCategory {
 	

@@ -6,7 +6,6 @@ import java.io.InputStream;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 
 import net.minecraft.block.Block;
 import net.minecraft.nbt.CompressedStreamTools;
