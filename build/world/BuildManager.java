@@ -140,6 +140,8 @@ public class BuildManager {
     	//if first pass mass AIR set is skipped, make sure the air from the schematics are printed, makes all mods happy
     	boolean replaceAir = !buildJob.useFirstPass;
     	
+    	if (buildJob.neverPlaceAir) replaceAir = false;
+    	
     	int loopCount;
     	int id = 0;
     	//worldRef.editingBlocks = true;
@@ -325,6 +327,9 @@ public class BuildManager {
 					    				int tryMeta = rotateMeta(worldRef, coords, buildJob.rotation, id, meta);
 					    				if (tryMeta != -1) meta = tryMeta;
 					    			}
+					    			
+					    			//custom id fixing 
+					    			//if (id == 98) id = 4;
 					    			
 					    			//System.out.println("printing: " + id + ", postMeta: " + meta);
 					    			//new protection against schematics printing missing ids that will eventually crash the game

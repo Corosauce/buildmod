@@ -7,8 +7,10 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.MovingObjectPosition;
+import net.minecraft.util.Vec3;
 
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
 
 import build.config.BuildConfig;
 import build.enums.EnumBuildState;
@@ -41,9 +43,12 @@ public class BuildClientTicks implements ITickHandler
     public static BuildClientTicks i = null;
     
     public int direction = 0;
+    public int lookDist = 20;
+    public int lastPlayerSlot = 0; //to fix scrollwheel state lock bug
     
     public BuildClientTicks() {
-    	clipboardData = new Build(0, 0, 0, "build");
+    	clipboardData = new Build(0, 0, 0, "clipboard", true);
+    	clipboardData.newFormat = true;
     }
 	
     @Override
@@ -91,7 +96,16 @@ public class BuildClientTicks implements ITickHandler
     {
     	Minecraft mc = FMLClientHandler.instance().getClient();
     	
-    	if (mc.renderViewEntity != null) extendedMouseOver = mc.renderViewEntity.rayTrace(20, partialTicks);
+    	if (mc.renderViewEntity != null) {
+    		extendedMouseOver = mc.renderViewEntity.rayTrace(lookDist, partialTicks);
+    		if (extendedMouseOver == null) {
+	    		Vec3 vec3 = mc.renderViewEntity.getPosition(partialTicks);
+	            Vec3 vec31 = mc.renderViewEntity.getLook(partialTicks);
+	            Vec3 vec32 = vec3.addVector(vec31.xCoord * lookDist, vec31.yCoord * lookDist, vec31.zCoord * lookDist);
+	            
+	            extendedMouseOver = new MovingObjectPosition((int)vec32.xCoord, (int)vec32.yCoord, (int)vec32.zCoord, 0, vec32);
+    		}
+    	}
     	
     	if (buildState == EnumBuildState.PLACE) {
     		//EntityPlayer player = FMLClientHandler.instance().getClient().thePlayer;
@@ -153,7 +167,12 @@ public class BuildClientTicks implements ITickHandler
     	if (buildState == EnumBuildState.PLACE) {
     		if (extendedMouseOver != null) {
     			//clipboardData.setCornerPosition(extendedMouseOver.blockX - (clipboardData.map_sizeX / 2), extendedMouseOver.blockY+1, extendedMouseOver.blockZ - (clipboardData.map_sizeZ / 2));
-    			clipboardData.setCornerPosition(extendedMouseOver.blockX, extendedMouseOver.blockY+1, extendedMouseOver.blockZ);
+    			if (mc.thePlayer.isSneaking()) {
+    				clipboardData.setCornerPosition(extendedMouseOver.blockX, (int)MathHelper.floor_double(mc.thePlayer.posY - mc.thePlayer.yOffset), extendedMouseOver.blockZ);
+    			} else {
+    				clipboardData.setCornerPosition(extendedMouseOver.blockX, extendedMouseOver.blockY+1, extendedMouseOver.blockZ);
+    			}
+    			
     		} else {
     			clipboardData.setCornerPosition((int)MathHelper.floor_double(mc.thePlayer.posX), (int)MathHelper.floor_double(mc.thePlayer.posY - mc.thePlayer.yOffset), (int)MathHelper.floor_double(mc.thePlayer.posZ));
     		}
@@ -169,6 +188,16 @@ public class BuildClientTicks implements ITickHandler
 	}
     
     public void updateInput() {
+    	
+    	int k = Mouse.getEventDWheel();
+    	if (k > 0) {
+    		k = 1;
+    	} else if (k < 0) { k = -1; }
+    	
+    	if (lastPlayerSlot != Minecraft.getMinecraft().thePlayer.inventory.currentItem) {
+    		lastPlayerSlot = Minecraft.getMinecraft().thePlayer.inventory.currentItem;
+    		if (k != 0) lookDist += k * 1;
+    	}
     	
     	if (Keyboard.isKeyDown(Keyboard.getKeyIndex(BuildConfig.key_Copy))) {
     		if (buildState != EnumBuildState.NORMAL) {
@@ -204,6 +233,7 @@ public class BuildClientTicks implements ITickHandler
     public void eventCopy() {
     	Minecraft mc = FMLClientHandler.instance().getClient();
     	if (copyState == EnumCopyState.NORMAL) {
+    		lookDist = 20;
     		copyState = EnumCopyState.SETMIN;
     	} else if (copyState == EnumCopyState.SETMIN) {
     		copyState = EnumCopyState.SETMAX;
@@ -228,6 +258,7 @@ public class BuildClientTicks implements ITickHandler
     		//REWIRED TO SEND ACTION TO SERVER AS WELL
 			clipboardData.recalculateLevelSize(sx, sy, sz, ex, ey, ez, true);
 			clipboardData.scanLevelToData(FMLClientHandler.instance().getClient().theWorld);
+			clipboardData.writeNBT();
 			FMLClientHandler.instance().getClient().thePlayer.sendQueue.addToSendQueue(BuildPacketHandler.getBuildCommandPacket(clipboardData, 0, -1));
 			
     		copyState = EnumCopyState.NORMAL;

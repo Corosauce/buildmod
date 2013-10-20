@@ -62,7 +62,7 @@ public class Build {
 	//- was to use integers instead of bytes, but that even wont be needed if unlocalized names are used (though use integer for saving out 
 	public boolean newFormat = false;
 	
-	public Build(int x, int y, int z, String parFile) {
+	public Build(int x, int y, int z, String parFile, boolean noLoad) {
 		//id = parID;
 		file = parFile;
 		
@@ -70,7 +70,11 @@ public class Build {
 		map_coord_minY = y;
 		map_coord_minZ = z;
 		
-		readNBT(file);
+		if (!noLoad) readNBT(file);
+	}
+	
+	public Build(int x, int y, int z, String parFile) {
+		this(x, y, z, parFile, false);
 	}
 	
 	public void load() {
@@ -238,7 +242,7 @@ public class Build {
 			
 		} catch (Exception ex) {
 			//notification off until generic build copy paste interface is supported for server
-			ex.printStackTrace();
+			//ex.printStackTrace();
 		}
 		
 	}

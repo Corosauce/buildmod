@@ -9,7 +9,8 @@ public class Clipboard implements IPlayerData {
 	public Build clipboardData;
 	
 	public Clipboard() {
-		clipboardData = new Build(0, 0, 0, "blank");
+		clipboardData = new Build(0, 0, 0, "blank", true);
+		clipboardData.newFormat = true;
 	}
 	
 	@Override

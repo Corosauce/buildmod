@@ -45,7 +45,7 @@ public class BuildPacketHandler implements IPacketHandler
 	            			int sX = dis.readInt();
 	            			int sY = dis.readInt();
 	            			int sZ = dis.readInt();
-	            			cb.clipboardData = new Build(x, y, z, entP.username + "_clipboard");
+	            			cb.clipboardData = new Build(x, y, z, entP.username + "_clipboard", true);
 	            			cb.clipboardData.dim = entP.worldObj.provider.dimensionId;
 	            			//cb.clipboardData.recalculateLevelSize(x, y, z, sX, sY, sZ, true);
 	            			cb.clipboardData.setCornerPosition(x, y, z);

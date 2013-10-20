@@ -41,6 +41,7 @@ public class BuildJob {
     public float rotation = 0;
     
     public boolean useFirstPass = true;
+    public boolean neverPlaceAir = false;
     
     public ICustomGen customGenCallback = null;
     public int customGenOffset = 0;
