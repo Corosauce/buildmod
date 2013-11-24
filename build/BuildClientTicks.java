@@ -8,6 +8,7 @@ import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
+import net.minecraft.util.Vec3Pool;
 
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -110,8 +111,13 @@ public class BuildClientTicks implements ITickHandler
     	if (buildState == EnumBuildState.PLACE) {
     		//EntityPlayer player = FMLClientHandler.instance().getClient().thePlayer;
     		//int l = MathHelper.floor_double((double)((-player.rotationYaw-45) * 4.0F / 360.0F)/* + 0.5D*/) & 3;
-    		Overlays.renderBuildOutline(clipboardData, direction);
-    		Overlays.renderDirectionArrow(clipboardData, direction);
+    		//Overlays.renderBuildOutline(clipboardData, direction);
+    		//Overlays.renderDirectionArrow(clipboardData, direction);
+    		
+    		Vec3 pos = Vec3.createVectorHelper(clipboardData.map_coord_minX, clipboardData.map_coord_minY, clipboardData.map_coord_minZ);
+    		Vec3 angle = Vec3.createVectorHelper(0, 0, 0);
+
+    		Overlays.renderBuildPreview(clipboardData, pos, angle);
     	} else if (copyState == EnumCopyState.SETMAX) {
     		int x = (int)MathHelper.floor_double(mc.thePlayer.posX);
     		int y = (int)MathHelper.floor_double(mc.thePlayer.posY - mc.thePlayer.yOffset);

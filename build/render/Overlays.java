@@ -1,11 +1,16 @@
 package build.render;
 
+import net.minecraft.block.Block;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.EntityRenderer;
+import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.pathfinding.PathPoint;
 import net.minecraft.util.ChunkCoordinates;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.Vec3;
+import net.minecraft.world.World;
 
 import org.lwjgl.opengl.GL11;
 
@@ -17,6 +22,45 @@ import cpw.mods.fml.relauncher.SideOnly;
 @SideOnly(Side.CLIENT)
 public class Overlays {
 
+	public static void renderBuildPreview(Build b, Vec3 pos, Vec3 angle) {
+		
+		Tessellator tess = Tessellator.instance;
+		float scale = 1F;
+		GL11.glPushMatrix();
+
+		Minecraft mc = Minecraft.getMinecraft();
+		
+		Vec3 posPlayer = Vec3.createVectorHelper(mc.thePlayer.posX, mc.thePlayer.posY, mc.thePlayer.posZ);
+		GL11.glTranslated(-posPlayer.xCoord, -posPlayer.yCoord, -posPlayer.zCoord);
+		GL11.glTranslated(pos.xCoord-0.5D, pos.yCoord+0.5D, pos.zCoord-0.5D);
+		
+		for (int x = 0; x < b.map_sizeX; x++) {
+			for (int y = 0; y < b.map_sizeY; y++) {
+				for (int z = 0; z < b.map_sizeZ; z++) {
+		    		
+		    		int id = b.build_blockIDArr[x][y][z];
+		    		int meta = b.build_blockMetaArr[x][y][z];
+		    		
+		    		if (id != 0) {
+		    			Block block = Block.blocksList[id];
+		    			
+		    			if (block != null) {
+		    				
+		    				GL11.glPushMatrix();
+		    				
+		    				GL11.glTranslated(x * scale, y * scale, z * scale);
+		    				
+		    				renderBlock(block, meta, 0, 0, 0);
+		    				
+		    				GL11.glPopMatrix();
+		    			}
+		    		}					
+				}
+			}
+		}
+		
+		GL11.glPopMatrix();
+	}
 	
 	public static void renderBuildOutline(Build b, int dir) {
 		float x = b.map_coord_minX;// + 0.5F;
@@ -158,5 +202,97 @@ public class Overlays {
 	    GL11.glEnable(GL11.GL_LIGHTING);
 	    GL11.glEnable(GL11.GL_TEXTURE_2D);
 	}
+	
+	public static void renderBlock(Block var2, int meta, int x, int y, int z)
+    {
+		World world = Minecraft.getMinecraft().theWorld;
+    	RenderBlocks a = new RenderBlocks(world);
+    	
+        float var8 = 0.5F;
+        float var9 = 1.0F;
+        float var10 = 0.8F;
+        float var11 = 0.6F;
+        Tessellator var12 = Tessellator.instance;
+        var12.startDrawingQuads();
+        //float var13 = var2.getBlockBrightness(var3, var4, var5, var6);
+        //float var14 = var2.getBlockBrightness(var3, var4, var5 - 1, var6);
+        var12.setBrightness(var2.getMixedBrightnessForBlock(world, x, y, z));
+
+        float var13 = 0.8F;
+        float var14 = 0.8F;
+        
+        var13 = 1F;//(float) (var13 + Math.cos((var1.worldObj.getWorldTime() * 0.3F) - (var1.blockRow * 0.5F)) * 0.15F);
+        var14 = var13;
+        
+        float var15 = 1.0F;
+        float var16 = 1.0F;
+        float var17 = 1.0F;
+
+        if (var2.blockID == Block.leaves.blockID)
+        {
+            int var18 = var2.colorMultiplier(world, x, y, z);
+            var15 = (float)(var18 >> 16 & 255) / 255.0F;
+            var16 = (float)(var18 >> 8 & 255) / 255.0F;
+            var17 = (float)(var18 & 255) / 255.0F;
+
+            if (EntityRenderer.anaglyphEnable)
+            {
+                float var19 = (var15 * 30.0F + var16 * 59.0F + var17 * 11.0F) / 100.0F;
+                float var20 = (var15 * 30.0F + var16 * 70.0F) / 100.0F;
+                float var21 = (var15 * 30.0F + var17 * 70.0F) / 100.0F;
+                var15 = var19;
+                var16 = var20;
+                var17 = var21;
+            }
+        }
+        
+        //NEW! - set block render size
+        a.setRenderBounds(0.0D, 0.0D, 0.0D, 1.0D, 1.0D, 1.0D);
+        //a.setRenderMinMax(0.25D, 0.25D, 0.25D, 0.75D, 0.75D, 0.75D);
+
+        var12.setColorOpaque_F(var15 * var8 * var14, var16 * var8 * var14, var17 * var8 * var14);
+        a.renderFaceYNeg(var2, -0.5D, -0.5D, -0.5D, var2.getIcon(0, meta));
+
+        if (var14 < var13)
+        {
+            var14 = var13;
+        }
+
+        var12.setColorOpaque_F(var15 * var9 * var14, var16 * var9 * var14, var17 * var9 * var14);
+        a.renderFaceYPos(var2, -0.5D, -0.5D, -0.5D, var2.getIcon(1, meta));
+
+        if (var14 < var13)
+        {
+            var14 = var13;
+        }
+
+        var12.setColorOpaque_F(var15 * var10 * var14, var16 * var10 * var14, var17 * var10 * var14);
+        a.renderFaceZNeg(var2, -0.5D, -0.5D, -0.5D, var2.getIcon(2, meta));
+
+        if (var14 < var13)
+        {
+            var14 = var13;
+        }
+
+        var12.setColorOpaque_F(var15 * var10 * var14, var16 * var10 * var14, var17 * var10 * var14);
+        a.renderFaceZPos(var2, -0.5D, -0.5D, -0.5D, var2.getIcon(3, meta));
+
+        if (var14 < var13)
+        {
+            var14 = var13;
+        }
+
+        var12.setColorOpaque_F(var15 * var11 * var14, var16 * var11 * var14, var17 * var11 * var14);
+        a.renderFaceXNeg(var2, -0.5D, -0.5D, -0.5D, var2.getIcon(4, meta));
+
+        if (var14 < var13)
+        {
+            var14 = var13;
+        }
+
+        var12.setColorOpaque_F(var15 * var11 * var14, var16 * var11 * var14, var17 * var11 * var14);
+        a.renderFaceXPos(var2, -0.5D, -0.5D, -0.5D, var2.getIcon(5, meta));
+        var12.draw();
+    }
 	
 }

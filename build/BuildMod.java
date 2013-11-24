@@ -86,9 +86,9 @@ public class BuildMod
         
         
         System.out.println("BuildMod Name Hash Conflicts: " + fails.size());
-        for (int i = 0; i < fails.size(); i++) {
+        /*for (int i = 0; i < fails.size(); i++) {
         	System.out.println(fails.get(i));
-        }
+        }*/
     }
     
     public static String lastWorldFolder = "";
