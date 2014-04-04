@@ -62,6 +62,8 @@ public class Build {
 	//- was to use integers instead of bytes, but that even wont be needed if unlocalized names are used (though use integer for saving out 
 	public boolean newFormat = false;
 	
+	public boolean backwardsCompatibleOldRotate = false;
+	
 	public Build(int x, int y, int z, String parFile, boolean noLoad) {
 		//id = parID;
 		file = parFile;
@@ -209,9 +211,13 @@ public class Build {
 							//time to translate using mapping!
 							int a = build_blockIDArr[xx][yy][zz];
 							if (a > blockIDHighestVanilla) {
-								int b = this.blockMappingNameToID.get(a);
-								//System.out.println("tra: " + a + " -> " + b);
-								build_blockIDArr[xx][yy][zz] = b;
+								//protect against javas autocasting primitves, incase of missing entry
+								if (this.blockMappingNameToID.containsKey(a)) {
+									Integer bb = this.blockMappingNameToID.get(a);
+									int b = Integer.valueOf(this.blockMappingNameToID.get(a));
+									//System.out.println("tra: " + a + " -> " + b);
+									build_blockIDArr[xx][yy][zz] = b;
+								}
 							}
 							
 							build_blockPlaced[xx][yy][zz] = false;
@@ -242,7 +248,7 @@ public class Build {
 			
 		} catch (Exception ex) {
 			//notification off until generic build copy paste interface is supported for server
-			//ex.printStackTrace();
+			ex.printStackTrace();
 		}
 		
 	}
@@ -279,7 +285,6 @@ public class Build {
 				for (int zz = 0; zz < map_sizeZ; zz++) {
 					int index = yy * map_sizeX * map_sizeZ + zz * map_sizeX + xx;
 					
-					//this line is not client side friendly
 					World worldRef = worldObj;
 					
 					build_blockIDArr[xx][yy][zz] = worldRef.getBlockId(map_coord_minX+xx, map_coord_minY+yy, map_coord_minZ+zz);
@@ -424,7 +429,11 @@ public class Build {
 			
 			while (it.hasNext()) {
 				NBTTagInt tag = (NBTTagInt)it.next();
-				finalMap.put(tag.data, swapMap.get(tag.getName()));
+				if (swapMap.get(tag.getName()) != null) {
+					finalMap.put(tag.data, swapMap.get(tag.getName()));
+				} else {
+					System.out.println("missing a mapping in this schematic for: " + tag.data);
+				}
 			}
 		} catch (Exception ex) {
 			ex.printStackTrace();

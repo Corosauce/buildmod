@@ -17,6 +17,7 @@ import net.minecraft.util.MathHelper;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
 import net.minecraftforge.common.DimensionManager;
+import build.ITileEntityCustomGenData;
 import build.SchematicData;
 import cpw.mods.fml.common.FMLCommonHandler;
 
@@ -233,6 +234,7 @@ public class BuildManager {
 			    		if (buildJob.pass == 2) {
 			    			buildComplete(buildJob);
 				    		buildJob.buildComplete();
+				    		if (buildJob.customGenCallback != null) buildJob.customGenCallback.genPassPre(worldRef, buildJob, -1);
 			    		} else {
 			    			buildJob.pass++;
 			    			buildJob.build_loopTickX = 0;
@@ -272,9 +274,16 @@ public class BuildManager {
 			    		ChunkCoordinates coords = new ChunkCoordinates(xx, yy, zz);
 		    			
 		    			if (buildJob.useRotationBuild) {
-		    				coords = rotate(coords, buildJob.direction, 
-		    						Vec3.createVectorHelper(buildJob.build_startX, buildJob.build_startY, buildJob.build_startZ), 
-		    						Vec3.createVectorHelper(build.map_sizeX, build.map_sizeY, build.map_sizeZ));
+		    				if (buildJob.build.backwardsCompatibleOldRotate) {
+		    					coords = rotate(coords, buildJob.direction, 
+			    						Vec3.createVectorHelper(buildJob.build_startX, buildJob.build_startY, buildJob.build_startZ), 
+			    						Vec3.createVectorHelper(build.map_sizeX, build.map_sizeY, build.map_sizeZ));
+		    				} else {
+		    					coords = rotateNew(coords, buildJob.direction, 
+			    						Vec3.createVectorHelper(buildJob.build_startX, buildJob.build_startY, buildJob.build_startZ), 
+			    						Vec3.createVectorHelper(build.map_sizeX, build.map_sizeY, build.map_sizeZ));
+		    				}
+		    				
 		    			}
 			    		worldRef.setBlock(coords.posX, coords.posY, coords.posZ, 0, 0, 2);
 			    		//}
@@ -319,10 +328,17 @@ public class BuildManager {
 					    			//System.out.println("newFormat: " + build.newFormat);
 					    			ChunkCoordinates coords = new ChunkCoordinates(xx, yy, zz);
 					    			//System.out.println("printing: " + id + ", preMeta: " + meta);
-					    			if (buildJob.useRotationBuild) {
-					    				coords = rotate(coords, buildJob.direction, 
-					    						Vec3.createVectorHelper(buildJob.build_startX, buildJob.build_startY, buildJob.build_startZ), 
-					    						Vec3.createVectorHelper(build.map_sizeX, build.map_sizeY, build.map_sizeZ));
+					    			if (buildJob.useRotationBuild/* && buildJob.direction != 0*/) {
+					    				//System.out.println("using new rotate");
+					    				if (buildJob.build.backwardsCompatibleOldRotate) {
+					    					coords = rotate(coords, buildJob.direction, 
+						    						Vec3.createVectorHelper(buildJob.build_startX, buildJob.build_startY, buildJob.build_startZ), 
+						    						Vec3.createVectorHelper(build.map_sizeX, build.map_sizeY, build.map_sizeZ));
+					    				} else {
+					    					coords = rotateNew(coords, buildJob.direction, 
+						    						Vec3.createVectorHelper(buildJob.build_startX, buildJob.build_startY, buildJob.build_startZ), 
+						    						Vec3.createVectorHelper(build.map_sizeX, build.map_sizeY, build.map_sizeZ));
+					    				}
 					    				
 					    				int tryMeta = rotateMeta(worldRef, coords, buildJob.rotation, id, meta);
 					    				if (tryMeta != -1) meta = tryMeta;
@@ -331,10 +347,24 @@ public class BuildManager {
 					    			//custom id fixing 
 					    			//if (id == 98) id = 4;
 					    			
-					    			//System.out.println("printing: " + id + ", postMeta: " + meta);
+					    			if (id > 3522) {
+					    				//System.out.println("!!!!!!! printing: " + id + ", postMeta: " + meta + " - ");
+					    			} else {
+					    				//System.out.println("printing: " + id + ", postMeta: " + meta + " - ");
+					    			}
 					    			//new protection against schematics printing missing ids that will eventually crash the game
 					    			if (Block.blocksList[id] != null || id == 0) {
 					    				worldRef.setBlock(coords.posX, coords.posY, coords.posZ, id, meta, 2);
+					    				//System.out.println("post print - " + coords.posX + " - " + coords.posZ);
+					    				/*if (buildJob.customGenCallback != null) {
+					    					NBTTagCompound nbt = buildJob.customGenCallback.getInitNBTTileEntity();
+					    					if (nbt != null) {
+					    						TileEntity te = worldRef.getBlockTileEntity(coords.posX, coords.posY, coords.posZ);
+					    						if (te instanceof ITileEntityCustomGenData) {
+					    							((ITileEntityCustomGenData) te).initWithNBT(nbt);
+					    						}
+					    					}
+					    				}*/
 					    			} else {
 					    				System.out.println("BUILDMOD SEVERE: schematic contains non existant blockID: " + id + ", replacing with blockID: " + placeholderID);
 					    				worldRef.setBlock(coords.posX, coords.posY, coords.posZ, placeholderID, 0, 2);
@@ -411,7 +441,29 @@ public class BuildManager {
 		return new ChunkCoordinates((int)Math.floor(newX), coords.posY, (int)Math.floor(newZ));
 	}
 	
+	/* coords: unrotated world coord, rotation: quantify to 90, start: uncentered world coords for structure start point, size: structure size */
+	public static ChunkCoordinates rotateNew(ChunkCoordinates coords, int direction, Vec3 start, Vec3 size) {
+		
+		//System.out.println("direction: " + direction);
+		
+		//center is not offsetted
+		//coords should be offset 0.5 before rotate math, guarantees no strange offset issues, flooring cleans it up afterwards perfectly
+		
+		double rotation = (direction * Math.PI/2D);
+		double centerX = start.xCoord+(size.xCoord/2D);
+		double centerZ = start.zCoord+(size.zCoord/2D);
+		double vecX = (coords.posX+0.5D) - centerX;
+		double vecZ = (coords.posZ+0.5D) - centerZ;
+		
+		Vec3 vec = Vec3.createVectorHelper(vecX, 0, vecZ);
+		vec.rotateAroundY((float)rotation);
+		return new ChunkCoordinates((int)Math.floor(start.xCoord+vec.xCoord), coords.posY, (int)Math.floor(start.zCoord+vec.zCoord));
+	}
+	
 	public int rotateMeta(World par1World, ChunkCoordinates coords, double rotation, int id, int meta) {
+		
+		//CHECK OUT  RotationHelper.metadataToDirection and RotationHelper.rotateMetadata !!!!!!!
+		
 		int dir = MathHelper.floor_double((double)(rotation * 4.0F / 360.0F) + 0.5D) & 3;
 		
 		dir = (((int)rotation) / 90) & 3;
@@ -534,6 +586,15 @@ public class BuildManager {
                 	((SchematicData)var13).readFromNBT(var20, build);
                 } else if (var13 != null) {
                 	var13.readFromNBT(var20);
+                }
+                
+                if (buildJob.customGenCallback != null) {
+					NBTTagCompound nbt = buildJob.customGenCallback.getInitNBTTileEntity();
+					if (nbt != null) {
+		                if (var13 instanceof ITileEntityCustomGenData) {
+							((ITileEntityCustomGenData) var13).initWithNBT(nbt);
+						}
+					}
                 }
                 
                 if (var13 != null) {

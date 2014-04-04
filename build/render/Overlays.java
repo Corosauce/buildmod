@@ -6,7 +6,9 @@ import net.minecraft.client.renderer.EntityRenderer;
 import net.minecraft.client.renderer.RenderBlocks;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderManager;
+import net.minecraft.client.renderer.texture.TextureMap;
 import net.minecraft.pathfinding.PathPoint;
+import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.ChunkCoordinates;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.Vec3;
@@ -103,18 +105,67 @@ public class Overlays {
 		renderLineFromToBlock(c1.posX, c1.posY, c1.posZ, c2.posX, c2.posY, c2.posZ, 0x00FF00);
 	}*/
 	
-	public static void renderBuildOutline(float x, float y, float z, float x1, float y1, float z1) {
+	public static void renderAABB(AxisAlignedBB aabb, int color) {
 		
-		x += 0.5F;
-		y += 0.5F;
-		z += 0.5F;
-		x1 += 0.5F;
-		y1 += 0.5F;
-		z1 += 0.5F;
+		double x = aabb.maxX;
+		double y = aabb.maxY;
+		double z = aabb.maxZ;
+		double x1 = aabb.minX;
+		double y1 = aabb.minY;
+		double z1 = aabb.minZ;
+		
+		//cross intersects
+		renderLineFromToBlock(x, y, z, x1, y1, z1, color);
+		renderLineFromToBlock(x1, y, z1, x, y1, z, color);
+		renderLineFromToBlock(x, y, z1, x1, y1, z, color);
+		renderLineFromToBlock(x1, y, z, x, y1, z1, color);
+		
+		//corner 0
+		renderLineFromToBlock(x, y, z, x, y, z1, color);
+		renderLineFromToBlock(x, y, z, x, y1, z, color);
+		renderLineFromToBlock(x, y, z, x1, y, z, color);
+		
+		//corner 1
+		renderLineFromToBlock(x1, y, z, x1, y1, z, color);
+		renderLineFromToBlock(x1, y, z, x1, y, z1, color);
+		
+		//corner 2
+		renderLineFromToBlock(x1, y, z1, x1, y1, z1, color);
+		renderLineFromToBlock(x1, y, z1, x, y, z1, color);
+		
+		//corner 3
+		renderLineFromToBlock(x, y, z1, x, y1, z1, color);
+		//renderLineFromToBlock(x1, y, z1, x, y, z1);
+		
+		//top parts
+		renderLineFromToBlock(x, y1, z, x1, y1, z, color);
+		renderLineFromToBlock(x1, y1, z, x1, y1, z1, color);
+		renderLineFromToBlock(x1, y1, z1, x, y1, z1, color);
+		renderLineFromToBlock(x, y1, z1, x, y1, z, color);
+	}
+	
+	public static void renderBuildOutline(float x, float y, float z, float x1, float y1, float z1) {
+		renderBuildOutline(x, y, z, x1, y1, z1, true, 0xFF0000);
+	}
+	
+	public static void renderBuildOutline(double x, double y, double z, double x1, double y1, double z1, boolean center, int parColor) {
+		renderBuildOutline((float)x, (float)y, (float)z, (float)x1, (float)y1, (float)z1, center, parColor);
+	}
+	
+	public static void renderBuildOutline(float x, float y, float z, float x1, float y1, float z1, boolean center, int parColor) {
+		
+		if (center) {
+			x += 0.5F;
+			y += 0.5F;
+			z += 0.5F;
+			x1 += 0.5F;
+			y1 += 0.5F;
+			z1 += 0.5F;
+		}
 		
 		//x += (mod_ZombieCraft.worldRef.rand.nextFloat() * 0.3F);
 		
-		int color = 0xFF0000;
+		int color = parColor;
 		
 		//cross intersects
 		renderLineFromToBlock(x, y, z, x1, y1, z1, color);
@@ -148,6 +199,66 @@ public class Overlays {
 		//renderLineFromToBlock(x1, y, z, x1, y1, z1);
 		
 	}
+	
+	/*public static void renderRectangle(Vector3f parStart, Vector3f parEnd, float angle, float radius, float height) {
+		float vecX = parEnd.x - parStart.x;
+		float vecZ = parEnd.z - parStart.z;
+		double dist = (double)Math.sqrt(vecX * vecX + vecZ * vecZ);
+		
+		//float angle = line.getAngle();
+		//float radius = line.thickness/2;
+		
+		for (int i = 0; i < 2; i++) {
+			float offset = 0.5F+i*height;
+			Vector3f vec = new Vector3f((float)-Math.sin(Math.toRadians(angle)) * radius, 0, (float)Math.cos(Math.toRadians(angle)) * radius);
+			
+			Vector3f start = new Vector3f(parStart.x + vec.x, parStart.y + offset, parStart.z + vec.z);
+			Vector3f end = new Vector3f(parEnd.x + vec.x, parEnd.y + offset, parEnd.z + vec.z);
+			renderLineFromToBlock(start.x, start.y, start.z, end.x, end.y, end.z, 0xFFFFFF);
+			angle -= 180;
+			vec = new Vector3f((float)-Math.sin(Math.toRadians(angle)) * radius, 0, (float)Math.cos(Math.toRadians(angle)) * radius);
+			start = new Vector3f(parStart.x + vec.x, parStart.y + offset, parStart.z + vec.z);
+			end = new Vector3f(parEnd.x + vec.x, parEnd.y + offset, parEnd.z + vec.z);
+			renderLineFromToBlock(start.x, start.y, start.z, end.x, end.y, end.z, 0xFFFFFF);
+			
+			angle -= 180;
+			vec = new Vector3f((float)-Math.sin(Math.toRadians(angle)) * radius, 0, (float)Math.cos(Math.toRadians(angle)) * radius);
+			start = new Vector3f(parStart.x + vec.x, parStart.y + offset, parStart.z + vec.z);
+			angle -= 180;
+			vec = new Vector3f((float)-Math.sin(Math.toRadians(angle)) * radius, 0, (float)Math.cos(Math.toRadians(angle)) * radius);
+			end = new Vector3f(parStart.x + vec.x, parStart.y + offset, parStart.z + vec.z);
+			renderLineFromToBlock(start.x, start.y, start.z, end.x, end.y, end.z, 0xFFFFFF);
+			
+			vec = new Vector3f((float)-Math.sin(Math.toRadians(angle)) * radius, 0, (float)Math.cos(Math.toRadians(angle)) * radius);
+			start = new Vector3f(parEnd.x + vec.x, parEnd.y + offset, parEnd.z + vec.z);
+			angle -= 180;
+			vec = new Vector3f((float)-Math.sin(Math.toRadians(angle)) * radius, 0, (float)Math.cos(Math.toRadians(angle)) * radius);
+			end = new Vector3f(parEnd.x + vec.x, parEnd.y + offset, parEnd.z + vec.z);
+			renderLineFromToBlock(start.x, start.y, start.z, end.x, end.y, end.z, 0xFFFFFF);
+		}
+		
+		Vector3f vec = new Vector3f((float)-Math.sin(Math.toRadians(angle)) * radius, 0, (float)Math.cos(Math.toRadians(angle)) * radius);
+		Vector3f start = new Vector3f(parStart.x + vec.x, parStart.y + 0.5F, parStart.z + vec.z);
+		Vector3f end = new Vector3f(parStart.x + vec.x, parStart.y + 0.5F + height, parStart.z + vec.z);
+		renderLineFromToBlock(start.x, start.y, start.z, end.x, end.y, end.z, 0xFFFFFF);
+		
+		angle -= 180;
+		vec = new Vector3f((float)-Math.sin(Math.toRadians(angle)) * radius, 0, (float)Math.cos(Math.toRadians(angle)) * radius);
+		start = new Vector3f(parStart.x + vec.x, parStart.y + 0.5F, parStart.z + vec.z);
+		end = new Vector3f(parStart.x + vec.x, parStart.y + 0.5F + height, parStart.z + vec.z);
+		renderLineFromToBlock(start.x, start.y, start.z, end.x, end.y, end.z, 0xFFFFFF);
+		
+		vec = new Vector3f((float)-Math.sin(Math.toRadians(angle)) * radius, 0, (float)Math.cos(Math.toRadians(angle)) * radius);
+		start = new Vector3f(parEnd.x + vec.x, parEnd.y + 0.5F, parEnd.z + vec.z);
+		end = new Vector3f(parEnd.x + vec.x, parEnd.y + 0.5F + height, parEnd.z + vec.z);
+		renderLineFromToBlock(start.x, start.y, start.z, end.x, end.y, end.z, 0xFFFFFF);
+		
+		angle -= 180;
+		vec = new Vector3f((float)-Math.sin(Math.toRadians(angle)) * radius, 0, (float)Math.cos(Math.toRadians(angle)) * radius);
+		start = new Vector3f(parEnd.x + vec.x, parEnd.y + 0.5F, parEnd.z + vec.z);
+		end = new Vector3f(parEnd.x + vec.x, parEnd.y + 0.5F + height, parEnd.z + vec.z);
+		renderLineFromToBlock(start.x, start.y, start.z, end.x, end.y, end.z, 0xFFFFFF);
+	}*/
 
 	public static void renderLine(PathPoint ppx, PathPoint ppx2, double d, double d1, double d2, float f, float f1, int stringColor) {
 		renderLineFromToBlock(ppx.xCoord, ppx.yCoord, ppx.zCoord, ppx2.xCoord, ppx2.yCoord, ppx2.zCoord, stringColor);
@@ -178,7 +289,7 @@ public class Overlays {
 	    double fishY = castProgress*(entY - pirateY);
 	    double fishZ = castProgress*(entZ - pirateZ);
 	    GL11.glDisable(GL11.GL_TEXTURE_2D);
-	    GL11.glDisable(GL11.GL_LIGHTING);
+	    //GL11.glDisable(GL11.GL_LIGHTING);
 	    tessellator.startDrawing(GL11.GL_LINE_STRIP);
 	    //GL11.GL_LINE_WIDTH
 	    //int stringColor = 0x888888;
@@ -199,7 +310,7 @@ public class Overlays {
 	    }
 	    
 	    tessellator.draw();
-	    GL11.glEnable(GL11.GL_LIGHTING);
+	    //GL11.glEnable(GL11.GL_LIGHTING);
 	    GL11.glEnable(GL11.GL_TEXTURE_2D);
 	}
 	
@@ -207,6 +318,8 @@ public class Overlays {
     {
 		World world = Minecraft.getMinecraft().theWorld;
     	RenderBlocks a = new RenderBlocks(world);
+    	
+    	Minecraft.getMinecraft().renderEngine.bindTexture(TextureMap.locationBlocksTexture);
     	
         float var8 = 0.5F;
         float var9 = 1.0F;
